@@ -1,4 +1,6 @@
-// Prompt classifiers shared by the UserPromptSubmit read and write hooks.
+// Prompt classifiers shared by the prompt hooks and Stop's transcript parser.
+
+import { existsSync } from "fs";
 
 // Terse acknowledgements
 export const TRIVIAL_REPLY_PATTERN = /^(yes|no|ok|sure|thanks|y|n|yep|nope|yeah|nah|continue|go ahead|do it|proceed)$/i;
@@ -35,13 +37,24 @@ export function stripLeadingReminders(prompt: string): string {
 
 // A typed slash command or skill invocation, recorded as
 // `<command-message>…</command-message> <command-name>/…</command-name>` (either tag first).
-const SLASH_COMMAND = /^<command-(name|message)>/;
-
-export function isSlashCommand(prompt: string): boolean {
-  return SLASH_COMMAND.test(stripLeadingReminders(prompt).trim());
-}
+const SLASH_COMMAND_ENVELOPE = /^<command-(name|message)>/;
 
 export function isHarnessInjected(prompt: string): boolean {
   const trimmed = stripLeadingReminders(prompt).trim();
   return !trimmed || HARNESS_INJECTED_PATTERNS.some((p) => p.test(trimmed));
+}
+
+// A slash command or skill invocation ("/compact", "/honcho:config", "/loop 5m
+// /foo"). A prompt that opens with an absolute path is not one, including a
+// single-component path such as "/tmp is missing": Claude Code sends that to
+// the model as text, so a name that exists at the filesystem root is a path.
+const SLASH_COMMAND = /^\/([\w:-]+)(?:\s|$)/;
+
+export function isSlashCommand(prompt: string): boolean {
+  const trimmed = stripLeadingReminders(prompt).trim();
+  // Stop sees transcript envelopes; UserPromptSubmit may see the raw command.
+  if (SLASH_COMMAND_ENVELOPE.test(trimmed)) return true;
+  const name = SLASH_COMMAND.exec(trimmed)?.[1];
+  if (!name) return false;
+  return name.includes(":") || !existsSync(`/${name}`);
 }

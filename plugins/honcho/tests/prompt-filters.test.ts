@@ -59,6 +59,20 @@ describe("isHarnessInjected", () => {
 });
 
 describe("isSlashCommand", () => {
+  test.each([
+    ["/compact", true],
+    ["/honcho:config", true],
+    ["/loop 5m /foo", true],
+    [worktreeNotice + "/honcho:status", true],
+    ["/Users/me/app/src/index.ts is failing", false],
+    ["/foo.ts is broken", false],
+    ["/tmp is missing", false],
+    ["/etc", false],
+    ["fix the /api route", false],
+  ])("%p -> %p", (prompt, expected) => {
+    expect(isSlashCommand(prompt)).toBe(expected);
+  });
+
   test("matches either tag order", () => {
     expect(isSlashCommand("<command-message>honcho:status</command-message>\n<command-name>/honcho:status</command-name>")).toBe(true);
     expect(isSlashCommand("<command-name>/model</command-name>\n<command-message>model</command-message>")).toBe(true);
